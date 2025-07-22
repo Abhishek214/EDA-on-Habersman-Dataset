@@ -1,28 +1,37 @@
-def apply_nms(self, boxes, scores, classes, iou_threshold=0.5):
-    """Apply NMS to remove overlapping detections"""
-    import cv2
+def convert_bbox_to_original_size(self, bbox, original_size, inference_size, framed_metas):
+    """
+    Convert bboxes from inference size back to original image size,
+    accounting for both scaling and padding from aspectaware_resize_padding
+    """
+    original_width, original_height = original_size
+    inference_width, inference_height = inference_size
     
-    if len(boxes) == 0:
-        return [], [], []
+    # Extract padding and scaling info from framed_metas
+    # framed_metas contains: [new_w, new_h, old_w, old_h, padding_w, padding_h]
+    new_w, new_h, old_w, old_h, padding_w, padding_h = framed_metas
     
-    # Convert to format expected by cv2.dnn.NMSBoxes
-    boxes_xywh = []
-    for box in boxes:
-        x1, y1, x2, y2 = box
-        w = x2 - x1
-        h = y2 - y1
-        boxes_xywh.append([x1, y1, w, h])
+    x_min_inference, y_min_inference, x_max_inference, y_max_inference = bbox
     
-    # Apply NMS
-    indices = cv2.dnn.NMSBoxes(boxes_xywh, scores, 0.0, iou_threshold)
+    # Step 1: Remove padding offsets
+    x_min_unpadded = x_min_inference - padding_w
+    y_min_unpadded = y_min_inference - padding_h  
+    x_max_unpadded = x_max_inference - padding_w
+    y_max_unpadded = y_max_inference - padding_h
     
-    if len(indices) > 0:
-        indices = indices.flatten()
-        return [boxes[i] for i in indices], [scores[i] for i in indices], [classes[i] for i in indices]
-    else:
-        return [], [], []
+    # Step 2: Scale back from resized dimensions to original dimensions
+    scale_x = old_w / new_w
+    scale_y = old_h / new_h
+    
+    x_min_original = x_min_unpadded * scale_x
+    y_min_original = y_min_unpadded * scale_y
+    x_max_original = x_max_unpadded * scale_x
+    y_max_original = y_max_unpadded * scale_y
+    
+    # Ensure coordinates are within image bounds
+    x_min_original = max(0, min(x_min_original, original_width))
+    y_min_original = max(0, min(y_min_original, original_height))
+    x_max_original = max(0, min(x_max_original, original_width))
+    y_max_original = max(0, min(y_max_original, original_height))
+    
+    return (int(x_min_original), int(y_min_original), int(x_max_original), int(y_max_original))
 
-
-# After getting ONNX results, before creating Items:
-if len(boxes) > 0:
-    boxes, scores, classes = self.apply_nms(boxes, scores, classes, iou_threshold=0.5)
