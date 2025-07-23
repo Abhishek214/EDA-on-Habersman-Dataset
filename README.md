@@ -1,18 +1,15 @@
-scale = min(input_size / orig_w, input_size / orig_h)
-    new_w = int(orig_w * scale)  # 768
-    new_h = int(orig_h * scale)  # 542
-    
-    # Calculate padding
-    padding_w = (input_size - new_w) // 2  # 0
-    padding_h = (input_size - new_h) // 2  # 113
-    
-    # Convert boxes
-    boxes[:, [0, 2]] -= padding_w  # Remove horizontal padding
-    boxes[:, [1, 3]] -= padding_h  # Remove vertical padding
-    boxes /= scale  # Scale back to original size
-    
-    # Clip to original image bounds
-    boxes[:, [0, 2]] = np.clip(boxes[:, [0, 2]], 0, orig_w)
-    boxes[:, [1, 3]] = np.clip(boxes[:, [1, 3]], 0, orig_h)
-    
-    return boxes
+import numpy as np
+
+def iou(box1, box2):
+    # box format: [x1, y1, x2, y2]
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    inter_area = max(0, x2 - x1) * max(0, y2 - y1)
+    box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+
+    union_area = box1_area + box2_area - inter_area
+    return inter_area / union_area if union_area != 0 else 0
